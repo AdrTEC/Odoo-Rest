@@ -1,0 +1,5 @@
+Flask==3.0.3
+Flask-Cors==4.0.1
+Flask-RESTful==0.3.10
+qrcode==8.0
+gunicorn==20.1.0  # o la versión más reciente disponible
