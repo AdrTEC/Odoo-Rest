@@ -11,7 +11,8 @@ import json
 #passwordProduction
 #passwordDev
 base_dir = os.path.dirname(os.path.abspath(__file__))  # Directorio base del proyecto
-config_path = os.path.join(base_dir, 'venv', 'config', 'passwordDev.json')
+config_path = os.path.join(base_dir,  'passwordDev.json')
+print(base_dir)
 
 # Cargar el archivo JSON
 with open(config_path, 'r') as file:
