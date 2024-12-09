@@ -10,21 +10,25 @@ import os
 import json
 #passwordProduction
 #passwordDev
-base_dir = os.path.dirname(os.path.abspath(__file__))  # Directorio base del proyecto
-config_path = os.path.join(base_dir,  'passwordDev.json')
-print(base_dir)
 
-# Cargar el archivo JSON
-with open(config_path, 'r') as file:
-    config = json.load(file)
+# base_dir = os.path.dirname(os.path.abspath(__file__))  # Directorio base del proyecto
+# config_path = os.path.join(base_dir,  'passwordDev.json')
+# print(base_dir)
 
-# Acceso a las variables
-url = config["url"]
-db = config["db"]
-username = config["username"]
-password = config["password"]
+# # Cargar el archivo JSON
+# with open(config_path, 'r') as file:
+#     config = json.load(file)
 
+# # Acceso a las variables
+# url = config["url"]
+# db = config["db"]
+# username = config["username"]
+# password = config["password"]
 
+url= "https://a-codigo-barras-v2.odoo.com"
+db= "a-codigo-barras-v2"
+username= "info@cenat.ac.cr"
+password= "123"
 
 
 
