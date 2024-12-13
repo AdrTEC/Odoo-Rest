@@ -3,7 +3,7 @@ import xmlrpc.client
 import qrcode
 from flask import Flask, jsonify, request, send_file
 from io import BytesIO
-
+from collections import defaultdict
 
 import os
 
@@ -202,67 +202,144 @@ scan_products = [
     }
 ]
 
-# Funciones para manejar las solicitudes
+
+
+
+
+def fetch_product_data(codebar):
+    return models.execute_kw(
+        db, uid, password,
+        'stock.lot', 'search_read',
+        [[['x_studio_codigo_de_barra_de_la_instancia', '=', codebar]]],
+        {'fields': [
+            'x_studio_codigo_de_barra_de_la_instancia',
+            'x_studio_ficha_de_seguridad',
+            'name',
+            'x_studio_presentation',
+            'x_studio_nombre',
+            'location_id',
+            'x_studio_estado',
+            'company_id',
+            'x_studio_ficha_tcnica',
+            'x_studio_laboratorio',
+            'x_studio_variantes_product',
+            'x_studio_trazabilidad',
+        ]}
+    )
+
+def fetch_variant_name(variant_id):
+    variant_info = models.execute_kw(
+        db, uid, password,
+        'product.attribute.value', 'search_read',
+        [[['id', '=', variant_id]]],
+        {'fields': ['name']}
+    )
+    return variant_info[0].get('name')
+
+def fetch_product_template(template_id):
+    return models.execute_kw(
+        db, uid, password,
+        'product.template', 'search_read',
+        [[['id', '=', template_id]]],
+        {'fields': [
+            'x_studio_descripcin_n_cas',
+            'x_studio_codigo_base',
+            'x_studio_uso_comn',
+            'x_studio_clasificacion_de_peligro_gsa',
+        ]}
+    )[0]
+
+def fetch_stock_by_variant(template_id):
+    quants = models.execute_kw(
+        db, uid, password,
+        'stock.quant', 'search_read',
+        [[['product_tmpl_id', '=', template_id], ['quantity', '>', 0]]],
+        {'fields': ['product_id', 'location_id']}
+    )
+    stock_by_variant = {}
+    quantPerVariant = defaultdict(list)
+    
+    for quant in quants:
+        product_id = quant['product_id'][1]  # Nombre de la variante
+        quantity = 1
+        stock_by_variant[product_id] = stock_by_variant.get(product_id, 0) + quantity
+        quantPerVariant[product_id].append(quant['location_id'][1])
+    
+    
+    # Agrupar ubicaciones y contar
+    for variant_name in quantPerVariant:
+        location_counts = defaultdict(int)
+        for location in quantPerVariant[variant_name]:
+            location_counts[location] += 1
+        quantPerVariant[variant_name] = location_counts
+
+    # Crear la estructura final
+    return [
+        {
+            'variation': variant_name,
+            'count': qty,
+            'stock': [{'location': loc, 'count': count} for loc, count in quantPerVariant[variant_name].items()]
+        }
+        for variant_name, qty in stock_by_variant.items()
+    ]
+
+def fetch_traceability(traceability_ids):
+    traceability_data = models.execute_kw(
+        db, uid, password,
+        'stock.move.line', 'search_read',
+        [[['id', 'in', traceability_ids], ['qty_done', '>', 0]]],
+        {'fields': ['location_dest_id', 'date'], 'limit': 15, 'order': 'date desc'}
+    )
+    return [
+        {
+            'date': record['date'],
+            'location_dest_id': record['location_dest_id'][1]  # Solo la dirección
+        }
+        for record in traceability_data
+    ]
+
+def build_response(product, variant, product_template, stock_response, traceability_data):
+    return {
+        'x_studio_laboratorio': product.get('x_studio_laboratorio')[1],
+        'x_studio_descripcin_n_cas': product_template.get('x_studio_descripcin_n_cas'),
+        'x_studio_codigo_base': product_template.get('x_studio_codigo_base'),
+        'x_studio_uso_comn': product_template.get('x_studio_uso_comn'),
+        'codebar': product.get('x_studio_codigo_de_barra_de_la_instancia'),
+        'securityDatasheet': product.get('x_studio_ficha_de_seguridad'),
+        'serialNumber': product.get('name'),
+        'presentation': variant,
+        'name': product.get('x_studio_nombre'),
+        'location_id': product.get('location_id'),
+        'x_studio_estado': product.get('x_studio_estado'),
+        'x_studio_trazabilidad': traceability_data,
+
+        'x_studio_clasificacion_de_peligro_gsa': product_template.get('x_studio_clasificacion_de_peligro_gsa'),
+        'stockByVariant': stock_response
+    }
 
 @app.route('/get-products/<string:codebar>', methods=['GET'])
 def get_product_info(codebar):
-    print("hola mundo")
     try:
-        # Buscar en el modelo `stock.lot` con el campo `x_studio_codigo_de_barra_de_la_instancia`
-        product_data = models.execute_kw(
-            db, uid, password,
-            'stock.lot', 'search_read',
-            [[['x_studio_codigo_de_barra_de_la_instancia', '=', codebar]]],
-            {'fields': [
-                'x_studio_codigo_de_barra_de_la_instancia',
-                'x_studio_ficha_de_seguridad',
-                'name',
-                'x_studio_presentation',
-                'x_studio_nombre',
-                'location_id',
-                'x_studio_estado',
-                'company_id',
-                'x_studio_laboratorio',
-                'x_studio_variantes_product',
-
-                
-            ]}
-        )
+        product_data = fetch_product_data(codebar)
         if not product_data:
             return jsonify({'error': 'Producto no encontrado', 'desc': 'El artículo no se encuentra en la base de datos'})
 
-        # Procesar el resultado y construir el JSON
-        product = product_data[0]  # Solo devolvemos el primer resultado
-        variant  = product.get('x_studio_presentation'),
-        if not  variant[0]:
-            print("xd")
-            variantId= product.get('x_studio_variantes_product')[0]
-            
-            variantInfo = models.execute_kw(
-                    db, uid, password,
-                    'product.attribute.value', 'search_read',
-                    [[['id', '=', variantId]]],
-                    {'fields': [
-                        'name',
-                    ]}
-                )
-            variant=[variantInfo[0].get('name')]
-            
-            
-        print(product.get('x_studio_variantes_product'))
-        print(variant)
-        response = {
-            'codebar': product.get('x_studio_codigo_de_barra_de_la_instancia'),
-            'securityDatasheet': product.get('x_studio_ficha_de_seguridad'),
-            'serialNumber': product.get('name'),
-            'presentation': variant,
-            'name': product.get('x_studio_nombre'),
-            'location_id': product.get('location_id')
-        }
+        product = product_data[0]
+        variant = product.get('x_studio_presentation') or fetch_variant_name(product.get('x_studio_variantes_product')[0])
+        product_template_id = product.get("x_studio_ficha_tcnica")[0]
+        product_template = fetch_product_template(product_template_id)
+        stock_response = fetch_stock_by_variant(product_template_id)
+        traceability_data = fetch_traceability(product.get('x_studio_trazabilidad'))
 
+        response = build_response(product, variant, product_template, stock_response, traceability_data)
         return jsonify(response), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+
+
+
 
 
 @app.route('/get-locations/<string:codebar>', methods=['GET'])
