@@ -299,8 +299,23 @@ def fetch_traceability(traceability_ids):
     ]
 
 def build_response(product, variant, product_template, stock_response, traceability_data):
+    
+    
+    print(product)
+    print("=========================================")
+    print(variant)
+    print("=========================================")
+    print(product_template )
+    print("=========================================")
+    print(stock_response)
+    print("=========================================")
+    print(traceability_data)
+    print("=========================================")
+    
+    
     return {
-        'x_studio_laboratorio': product.get('x_studio_laboratorio')[1],
+        'x_studio_laboratorio': "Sin asignar" if not product.get('x_studio_laboratorio') else product.get('x_studio_laboratorio')[1],
+
         'x_studio_descripcin_n_cas': product_template.get('x_studio_descripcin_n_cas'),
         'x_studio_codigo_base': product_template.get('x_studio_codigo_base'),
         'x_studio_uso_comn': product_template.get('x_studio_uso_comn'),
@@ -325,13 +340,20 @@ def get_product_info(codebar):
             return jsonify({'error': 'Producto no encontrado', 'desc': 'El artículo no se encuentra en la base de datos'})
 
         product = product_data[0]
+    
         variant = product.get('x_studio_presentation') or fetch_variant_name(product.get('x_studio_variantes_product')[0])
+    
         product_template_id = product.get("x_studio_ficha_tcnica")[0]
+    
         product_template = fetch_product_template(product_template_id)
+    
         stock_response = fetch_stock_by_variant(product_template_id)
+    
         traceability_data = fetch_traceability(product.get('x_studio_trazabilidad'))
+    
 
         response = build_response(product, variant, product_template, stock_response, traceability_data)
+        print(response)
         return jsonify(response), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
