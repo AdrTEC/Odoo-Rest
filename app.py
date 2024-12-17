@@ -2,8 +2,6 @@
 from flask_cors import CORS, cross_origin
 from flask import Flask
 
-
-
 from product_Service import ProductService
 from location_Service import LocationService
 from user_Service import LocationService
