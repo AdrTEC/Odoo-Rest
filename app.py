@@ -1,10 +1,9 @@
 
 from flask_cors import CORS, cross_origin
-from flask import Flask
-
+from flask import Flask, jsonify, request, send_file
 from product_Service import ProductService
 from location_Service import LocationService
-from user_Service import LocationService
+from user_Service import UserService
 
 
 
@@ -17,7 +16,7 @@ app = Flask(__name__)
 CORS(app) 
 product_Service= ProductService( )
 location_Service= LocationService( )
-user_Service= LocationService( )
+user_Service= UserService( )
 
 
 

@@ -3,7 +3,7 @@ from flask import jsonify
 from collections import defaultdict
 from odoo_Service import OdooService
 
-class LocationService(OdooService):
+class UserService(OdooService):
     
     def fetch_user(self,data):
         try:
