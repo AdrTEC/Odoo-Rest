@@ -508,6 +508,113 @@ def doConecctionTest():
 
 
 
+
+@app.route('/search_Product/<string:search_term>', methods=['GET'])
+def search_product(search_term):
+    try:
+        search_conditions = [['x_studio_ficha_tcnica.name', 'ilike', search_term]]
+        results = []
+
+        # Detect sequence with "- int"
+        if '-' in search_term:
+            term_parts = search_term.rsplit('-', 1)
+            base_term = term_parts[0].strip()
+            try:
+                search_number = int(term_parts[1].strip())
+                # Search for lot.name == number
+                lot_name_results = models.execute_kw(
+                    db, uid, password,
+                    'stock.lot', 'search_read',
+                    [[['name', '=', str(search_number)], ['x_studio_ficha_tcnica.name', 'ilike', base_term]]],
+                    {'fields': ['name', 'x_studio_ficha_tcnica', 'x_studio_codigo_de_barras_base'], 'limit': 15}
+                )
+                results.extend(lot_name_results)
+            except ValueError:
+                pass
+
+        # General search by x_studio_ficha_tcnica.name
+        general_results = models.execute_kw(
+            db, uid, password,
+            'stock.lot', 'search_read',
+            [[['x_studio_ficha_tcnica.name', 'ilike', search_term]]],
+            {'fields': ['name', 'x_studio_ficha_tcnica', 'x_studio_codigo_de_barras_base'], 'limit': 15}
+        )
+        results.extend(general_results)
+
+        # Search by x_studio_codigo_de_barras_base
+        barcode_results = models.execute_kw(
+            db, uid, password,
+            'stock.lot', 'search_read',
+            [[['x_studio_codigo_de_barras_base', 'ilike', search_term]]],
+            {'fields': ['name', 'x_studio_ficha_tcnica', 'x_studio_codigo_de_barras_base'], 'limit': 15}
+        )
+        results.extend(barcode_results)
+
+        # Remove duplicates and limit to 15 results total
+        unique_results = {r['id']: r for r in results}.values()
+        final_results = list(unique_results)[:15]
+
+        # Search in product.template for products without stock
+        no_stock_results = []
+        product_template_results = models.execute_kw(
+            db, uid, password,
+            'product.template', 'search_read',
+            [[['name', 'ilike', search_term]]],
+            {'fields': ['id', 'name']}
+        )
+
+        for product in product_template_results:
+            # Check for quantities in stock.quant
+            stock_quant_results = models.execute_kw(
+                db, uid, password,
+                'stock.quant', 'search_read',
+                [[['product_tmpl_id', '=', product['id']], ['quantity', '>', 0]]],
+                {'fields': ['quantity']}
+            )
+            if not stock_quant_results:  # No stock found
+                no_stock_results.append({'id': product['id'], 'name': product['name'], 'quantity': 0})
+
+        return jsonify({'results': final_results, 'no_stock_products': no_stock_results}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
+@app.route('/fetch_user', methods=['POST'])
+def fetch_user():
+    try:
+        data = request.get_json()
+        barcode = data.get('barcode')
+        if not barcode:
+            return jsonify({'error': 'No barcode provided'}), 400
+
+        # Search for employee by barcode
+        employee_data = models.execute_kw(
+            db, uid, password,
+            'hr.employee', 'search_read',
+            [[['barcode', '=', barcode]]],
+            {'fields': ['name','id']}
+        )
+
+        if not employee_data:
+            return jsonify({'error': 'Employee not found'}), 404
+
+        employee = employee_data[0]
+        return jsonify({'name': employee['name'], 'id':employee['id']}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
 # Iniciar la aplicación Flask
 if __name__ == '__main__':
     app.run(host="0.0.0.0" ,port="8090")
